@@ -6,12 +6,17 @@ import {
   StyleSheet,
   Text,
   SafeAreaView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { inject, observer } from "mobx-react";
 import authStoreInstance from "../../api/AuthStore";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { LoginStackParams } from "../../App";
 import { RouteProp } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 
 type WelcomeScreenNavigationProp = StackNavigationProp<
   LoginStackParams,
@@ -30,7 +35,28 @@ const WelcomeScreen: React.FC<Props> = inject("authStore")(
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
 
+    const validateEmail = (email: string) => {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(String(email).toLowerCase());
+    };
+
     const handleSignIn = async () => {
+      if (!email || !password) {
+        Toast.show({
+          type: "error",
+          text1: "All fields are required!",
+        });
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        Toast.show({
+          type: "error",
+          text1: "Invalid email format!",
+        });
+        return;
+      }
+
       if (authStore) {
         await authStore.signIn(email, password);
         if (authStore.user) {
@@ -40,42 +66,47 @@ const WelcomeScreen: React.FC<Props> = inject("authStore")(
     };
 
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <View style={styles.welcomeTextContainer}>
-            <Text style={styles.welcomeText}>Welcome to Task Manager!</Text>
-          </View>
-          <View>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-            <Button title="Sign In" onPress={handleSignIn} />
-          </View>
-          <View style={styles.signUpContainer}>
-            <Text style={styles.signupText}>Don't have an account?</Text>
-            <Text
-              style={styles.signupTextButton}
-              onPress={() => navigation.navigate("SignUp")}
-            >
-              {" "}
-              Sign up
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <SafeAreaView style={styles.safeArea}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.container}
+          >
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeText}>Welcome to Task Manager!</Text>
+            </View>
+            <View>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <Button title="Sign In" onPress={handleSignIn} />
+            </View>
+            <View style={styles.signUpContainer}>
+              <Text style={styles.signupText}>Don't have an account?</Text>
+              <Text
+                style={styles.signupTextButton}
+                onPress={() => navigation.navigate("SignUp")}
+              >
+                {" "}
+                Sign up
+              </Text>
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     );
   })
 );
