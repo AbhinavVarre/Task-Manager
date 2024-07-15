@@ -16,12 +16,14 @@ interface Props {
 }
 
 const SignUpScreen: React.FC<Props> = inject('authStore')(observer(({ authStore, navigation }) => {
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
   const handleSignUp = async () => {
     if (authStore) {
-      await authStore.signUp(email, password);
+      await authStore.signUp(email, password, firstName, lastName);
       if (authStore.user) {
         navigation.navigate('Tabs');
       }
@@ -30,6 +32,20 @@ const SignUpScreen: React.FC<Props> = inject('authStore')(observer(({ authStore,
 
   return (
     <View style={styles.container}>
+      <TextInput
+        style={styles.input}
+        placeholder="First Name"
+        value={firstName}
+        onChangeText={setFirstName}
+        autoCapitalize="words"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Last Name"
+        value={lastName}
+        onChangeText={setLastName}
+        autoCapitalize="words"
+      />
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -75,34 +91,3 @@ const styles = StyleSheet.create({
 });
 
 export default SignUpScreen;
-
-
-
-
-
-
-// const handleSignUp = async () => {
-//     try {
-//       const res = await createUserWithEmailAndPassword(
-//         auth,
-//         "varre.abhinav@gmail.com",
-//         "testing"
-//       );
-//       console.log(res);
-//     } catch (err) {
-//       console.log(err);
-//     }
-//   };
-  
-//   const handlePostToDB = async () => {
-//     try {
-//       const db = getFirestore();
-//       const docRef = await addDoc(collection(db, "task"), {
-//         taskName: "Complete Homework",
-//         taskDescription: "Physics, bio, chem",
-//       });
-//       console.log("Document written with ID: ", docRef.id);
-//     } catch (err) {
-//       console.log(err);
-//     }
-//   };

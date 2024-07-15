@@ -19,7 +19,21 @@ export interface Task {
     completed?: boolean
   }
   
-  export interface TaskToDelete {
-    id: string;
-  }
+
   
+export interface UserToCreate {
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface User extends UserToCreate {
+  id: string;
+  tasksCompleted: number;
+}
+
+export interface LeaderBoardUser {
+  firstName: string;
+  lastName: string;
+  tasksCompleted: number;
+}
