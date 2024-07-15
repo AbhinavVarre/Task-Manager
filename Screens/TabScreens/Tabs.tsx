@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import LeaderBoard from "./LeaderBoard/LeaderBoard";
 import Profile from "./Profile/Profile";
 import TaskManager from "./TaskManager/TaskManager";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Icon } from "react-native-elements";
 
 export type TabsParams = {
   LeaderBoard: undefined;
@@ -15,12 +15,56 @@ const TabBar = createBottomTabNavigator<TabsParams>();
 
 const Tabs = () => {
   return (
-    <TabBar.Navigator screenOptions={{ headerShown: false }}>
+    <TabBar.Navigator
+      screenOptions={{ headerShown: false, tabBarActiveTintColor: "black" }}
+    >
+      <TabBar.Screen
+        name="TaskManager"
+        // @ts-ignore
+        component={TaskManager}
+        options={{
+          tabBarIcon: ({ size, focused }) => (
+            <Icon
+              name="task-alt"
+              type="material"
+              size={size}
+              color={focused ? "black" : "gray"}
+            />
+          ),
+          title: "Tasks",
+        }}
+      />
+      <TabBar.Screen
+        name="LeaderBoard"
+        component={LeaderBoard}
+        options={{
+          tabBarIcon: ({ size, focused }) => (
+            <Icon
+              name="leaderboard"
+              type="material"
+              size={size}
+              color={focused ? "black" : "gray"}
+            />
+          ),
+          title: "Leaderboard",
+        }}
+      />
       {/* @ts-ignore */}
-      <TabBar.Screen name="TaskManager" component={TaskManager} />
-      <TabBar.Screen name="LeaderBoard" component={LeaderBoard} />
-      {/* @ts-ignore */}
-      <TabBar.Screen name="Profile" component={Profile} />
+      <TabBar.Screen
+        name="Profile"
+        component={Profile}
+        options={{
+          tabBarIcon: ({ size, focused }) => (
+            <Icon
+              name="person"
+              type="material"
+              size={size}
+              color={focused ? "black" : "gray"}
+            />
+          ),
+          title: "Profile",
+        }}
+      />
     </TabBar.Navigator>
   );
 };

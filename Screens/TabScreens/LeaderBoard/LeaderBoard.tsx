@@ -7,26 +7,32 @@ interface Props {
   taskStore?: typeof taskStoreInstance;
 }
 
-const LeaderBoard: React.FC<Props> = inject("taskStore")(observer(({ taskStore }) => {
-  return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>LeaderBoard</Text>
-      <FlatList
-        data={taskStore?.leaderBoard}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item, index }) => (
-          <View style={styles.item}>
-            <Text style={styles.rank}>{index + 1}</Text>
-            <View style={styles.userInfo}>
-              <Text style={styles.name}>{item.firstName} {item.lastName}</Text>
-              <Text style={styles.tasks}>Tasks Completed: {item.tasksCompleted}</Text>
+const LeaderBoard: React.FC<Props> = inject("taskStore")(
+  observer(({ taskStore }) => {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.header}>LeaderBoard</Text>
+        <FlatList
+          data={taskStore?.leaderBoard}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item, index }) => (
+            <View style={styles.item}>
+              <Text style={styles.rank}>{index + 1}</Text>
+              <View style={styles.userInfo}>
+                <Text style={styles.name}>
+                  {item.firstName} {item.lastName}
+                </Text>
+                <Text style={styles.tasks}>
+                  Tasks Completed: {item.tasksCompleted}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
-      />
-    </SafeAreaView>
-  );
-}));
+          )}
+        />
+      </SafeAreaView>
+    );
+  })
+);
 
 const styles = StyleSheet.create({
   container: {
