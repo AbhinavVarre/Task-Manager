@@ -1,17 +1,18 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import {
-  getFirestore,
   collection,
   query,
   where,
   onSnapshot,
   addDoc,
-  updateDoc,
   deleteDoc,
   doc,
   getDoc,
   orderBy,
   getDocs,
+  writeBatch,
+  increment,
+  Timestamp,
 } from "firebase/firestore";
 import { firestore } from "./firebaseConfig";
 import { Task, TaskToCreate, TaskToUpdate } from "./types";
@@ -20,6 +21,13 @@ import { User as FullUser, LeaderBoardUser } from "./types";
 class TaskStore {
   tasks: Task[] = [];
   leaderBoard: LeaderBoardUser[] = [];
+  leaderBoardIsLoading: boolean = false;
+  batchedUpdates: Map<string, TaskToUpdate> = new Map();
+  initialTaskStates: Map<string, boolean> = new Map();
+  finalTaskStates: Map<string, boolean> = new Map();
+  userIncrements: Map<string, number> = new Map();
+  batchTimeout: NodeJS.Timeout | null = null;
+  unsubscribeLeaderBoard: () => void = () => {}; // Unsubscribe function for leaderboard listener
 
   constructor() {
     makeAutoObservable(this);
@@ -50,7 +58,9 @@ class TaskStore {
 
   async addTask(task: TaskToCreate) {
     try {
-      await addDoc(collection(firestore, "tasks"), task);
+      await addDoc(collection(firestore, "tasks"), {
+        ...task,
+      });
     } catch (error) {
       console.error("Error adding task:", error);
     }
@@ -60,67 +70,169 @@ class TaskStore {
     try {
       const taskDocRef = doc(firestore, "tasks", id);
       const taskDocSnapshot = await getDoc(taskDocRef);
+      if (!taskDocSnapshot.exists()) {
+        throw new Error(`Task with id ${id} does not exist.`);
+      }
       const existingTaskData = {
         id: taskDocSnapshot.id,
         ...taskDocSnapshot.data(),
       } as Task;
-      const taskToUpdate = { ...existingTaskData };
-      //   TODO: maybe loop through keys to make more maintainable
-      if (updatedTask.title && updatedTask.title !== existingTaskData.title) {
-        taskToUpdate.title = updatedTask.title;
-      }
-      if (
-        updatedTask.description &&
-        updatedTask.description !== existingTaskData.description
-      ) {
-        taskToUpdate.description = updatedTask.description;
-      }
-      if (
-        updatedTask.completed !== undefined &&
-        updatedTask.completed !== existingTaskData.completed
-      ) {
-        taskToUpdate.completed = updatedTask.completed;
-        this.incrementTasksCompleted(existingTaskData.userId, updatedTask.completed ? 1 : -1);
+
+      if (!this.initialTaskStates.has(id)) {
+        this.initialTaskStates.set(id, existingTaskData.completed);
       }
 
-      await updateDoc(taskDocRef, taskToUpdate);
+      if (updatedTask.completed !== undefined) {
+        this.finalTaskStates.set(id, updatedTask.completed);
+        if (updatedTask.completed) {
+          updatedTask.completedAt = Timestamp.now();
+        }
+      }
+
+      this.batchedUpdates.set(id, updatedTask);
+
+      if (this.batchTimeout) {
+        clearTimeout(this.batchTimeout);
+      }
+
+      this.batchTimeout = setTimeout(() => this.executeBatchedUpdates(), 1000);
+
+      runInAction(() => {
+        this.leaderBoardIsLoading = true;
+      });
     } catch (error) {
       console.error("Error updating task:", error);
-    }
-  }
-
-  private async incrementTasksCompleted(userId: string, increment: number) {
-    try {
-      const userDocRef = doc(firestore, "users", userId);
-      const userDocSnapshot = await getDoc(userDocRef);
-      const existingUserData = {
-        id: userDocSnapshot.id,
-        ...userDocSnapshot.data(),
-      } as FullUser;
-      const userToUpdate = {
-        ...existingUserData,
-        tasksCompleted: existingUserData.tasksCompleted + increment,
-      };
-      await updateDoc(userDocRef, userToUpdate);
-      this.updateLeaderBoard();
-    } catch (error) {
-      console.error("Error incrementing tasks completed:", error);
-    }
-  }
-
-  private async updateLeaderBoard() {
-    try {
-      const q = query(collection(firestore, "users"), orderBy("tasksCompleted", "desc"));
-      const querySnapshot = await getDocs(q);
-      const leaderBoardList: LeaderBoardUser[] = [];
-      querySnapshot.forEach((doc) => {
-        leaderBoardList.push({ firstName: doc.data().firstName, lastName: doc.data().lastName, tasksCompleted: doc.data().tasksCompleted } as LeaderBoardUser);
-      });
       runInAction(() => {
-        this.leaderBoard = leaderBoardList;
+        this.leaderBoardIsLoading = false;
+      });
+    }
+  }
+
+  async executeBatchedUpdates() {
+    const batch = writeBatch(firestore);
+
+    this.batchedUpdates.forEach((changes, id) => {
+      const taskDocRef = doc(firestore, "tasks", id);
+      batch.update(taskDocRef, { ...changes });
+    });
+
+    this.finalTaskStates.forEach((completed, taskId) => {
+      const initialCompleted = this.initialTaskStates.get(taskId);
+      if (initialCompleted !== undefined && initialCompleted !== completed) {
+        const userId = this.tasks.find((task) => task.id === taskId)?.userId;
+        if (userId) {
+          const incrementValue = completed ? 1 : -1;
+          this.userIncrements.set(
+            userId,
+            (this.userIncrements.get(userId) || 0) + incrementValue
+          );
+        }
+      }
+    });
+
+    this.userIncrements.forEach((incrementValue, userId) => {
+      const userDocRef = doc(firestore, "users", userId);
+      batch.update(userDocRef, {
+        tasksCompleted: increment(incrementValue),
+      });
+    });
+
+    try {
+      await batch.commit();
+      runInAction(() => {
+        this.batchedUpdates.clear();
+        this.initialTaskStates.clear();
+        this.finalTaskStates.clear();
+        this.userIncrements.clear();
+        this.updateLeaderBoard();
+        this.leaderBoardIsLoading = false;
+      });
+    } catch (error) {
+      console.error("Error executing batched updates:", error);
+      runInAction(() => {
+        this.leaderBoardIsLoading = false;
+      });
+    }
+  }
+
+  updateLeaderBoard(dateRange?: { start: Date; end: Date }) {
+    runInAction(() => {
+      this.leaderBoardIsLoading = true;
+    });
+
+    if (this.unsubscribeLeaderBoard) {
+      this.unsubscribeLeaderBoard();
+    }
+
+    try {
+      let q;
+      if (dateRange) {
+        const { start, end } = dateRange;
+        q = query(
+          collection(firestore, "tasks"),
+          where("completed", "==", true),
+          where("completedAt", ">=", Timestamp.fromDate(start)),
+          where("completedAt", "<=", Timestamp.fromDate(end)),
+          orderBy("completedAt", "desc")
+        );
+      } else {
+        q = query(
+          collection(firestore, "users"),
+          orderBy("tasksCompleted", "desc")
+        );
+      }
+
+      this.unsubscribeLeaderBoard = onSnapshot(q, async (querySnapshot) => {
+        const leaderBoardList: LeaderBoardUser[] = [];
+
+        if (dateRange) {
+          const userTaskCounts: Map<string, number> = new Map();
+
+          querySnapshot.forEach((doc) => {
+            const taskData = doc.data() as Task;
+            if (taskData.userId) {
+              userTaskCounts.set(
+                taskData.userId,
+                (userTaskCounts.get(taskData.userId) || 0) + 1
+              );
+            }
+          });
+
+          for (const [userId, tasksCompleted] of userTaskCounts.entries()) {
+            const userDocRef = doc(firestore, "users", userId);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data() as FullUser;
+              leaderBoardList.push({
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                tasksCompleted,
+              });
+            }
+          }
+        } else {
+          querySnapshot.forEach((doc) => {
+            leaderBoardList.push({
+              firstName: doc.data().firstName,
+              lastName: doc.data().lastName,
+              tasksCompleted: doc.data().tasksCompleted,
+            } as LeaderBoardUser);
+          });
+        }
+
+        // Sort the leaderboard by tasksCompleted in descending order
+        leaderBoardList.sort((a, b) => b.tasksCompleted - a.tasksCompleted);
+
+        runInAction(() => {
+          this.leaderBoard = leaderBoardList;
+          this.leaderBoardIsLoading = false;
+        });
       });
     } catch (error) {
       console.error("Error updating leader board:", error);
+      runInAction(() => {
+        this.leaderBoardIsLoading = false;
+      });
     }
   }
 
@@ -128,14 +240,34 @@ class TaskStore {
     try {
       const taskDocRef = doc(firestore, "tasks", id);
       const taskDocSnapshot = await getDoc(taskDocRef);
+      if (!taskDocSnapshot.exists()) {
+        throw new Error(`Task with id ${id} does not exist.`);
+      }
       const task = {
         id: taskDocSnapshot.id,
         ...taskDocSnapshot.data(),
       } as Task;
       await deleteDoc(taskDocRef);
-      this.incrementTasksCompleted(task.userId, -1);
+      this.batchedUpdates.delete(task.id);
+      this.userIncrements.set(
+        task.userId,
+        (this.userIncrements.get(task.userId) || 0) - 1
+      );
+
+      if (this.batchTimeout) {
+        clearTimeout(this.batchTimeout);
+      }
+
+      this.batchTimeout = setTimeout(() => this.executeBatchedUpdates(), 1000);
+
+      runInAction(() => {
+        this.leaderBoardIsLoading = true;
+      });
     } catch (error) {
       console.error("Error deleting task:", error);
+      runInAction(() => {
+        this.leaderBoardIsLoading = false;
+      });
     }
   }
 }

@@ -42,29 +42,38 @@ const WelcomeScreen: React.FC<Props> = inject("authStore")(
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          <Button title="Sign In" onPress={handleSignIn} />
-          <Text
-            style={styles.signupText}
-            onPress={() => navigation.navigate("SignUp")}
-          >
-            Don't have an account? Sign Up
-          </Text>
+          <View style={styles.welcomeTextContainer}>
+            <Text style={styles.welcomeText}>Welcome to Task Manager!</Text>
+          </View>
+          <View>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <Button title="Sign In" onPress={handleSignIn} />
+          </View>
+          <View style={styles.signUpContainer}>
+            <Text style={styles.signupText}>Don't have an account?</Text>
+            <Text
+              style={styles.signupTextButton}
+              onPress={() => navigation.navigate("SignUp")}
+            >
+              {" "}
+              Sign up
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -75,10 +84,19 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  welcomeTextContainer: {
+    alignItems: "center",
+    paddingTop: 50,
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
   container: {
     flex: 1,
     padding: 16,
-    justifyContent: "center",
+    justifyContent: "space-around",
     width: "100%",
   },
   input: {
@@ -89,10 +107,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     width: "100%",
   },
-  signupText: {
-    marginTop: 16,
-    color: "blue",
+  signupTextButton: {
     textAlign: "center",
+    color: "#007AFF",
+  },
+  signupText: {
+    textAlign: "center",
+  },
+  signUpContainer: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "center",
   },
 });
 

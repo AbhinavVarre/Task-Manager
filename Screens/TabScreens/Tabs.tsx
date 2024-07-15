@@ -16,7 +16,7 @@ const TabBar = createBottomTabNavigator<TabsParams>();
 const Tabs = () => {
   return (
     <TabBar.Navigator
-      screenOptions={{ headerShown: false, tabBarActiveTintColor: "black" }}
+      screenOptions={{ headerShown: false, tabBarActiveTintColor: "black", headerTintColor: "white",   }}
     >
       <TabBar.Screen
         name="TaskManager"

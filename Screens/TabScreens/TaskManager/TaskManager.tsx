@@ -1,12 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Button,
-  StyleSheet,
-  SafeAreaView,
-} from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, StyleSheet, SafeAreaView } from "react-native";
 import { inject, observer } from "mobx-react";
 import authStoreInstance from "../../../api/AuthStore";
 import taskStoreInstance from "../../../api/TaskStore";
@@ -15,6 +8,10 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RouteProp } from "@react-navigation/native";
 import { Task, TaskToCreate } from "../../../api/types";
 import TaskComponent from "./TaskComponent";
+import { Icon } from "react-native-elements";
+import Toast from "react-native-toast-message";
+import { FlatList } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 type TaskManagerNavigationProp = StackNavigationProp<TabsParams, "TaskManager">;
 type TaskManagerRouteProp = RouteProp<TabsParams, "TaskManager">;
@@ -32,8 +29,8 @@ const TaskManager: React.FC<Props> = inject(
 )(
   observer(({ authStore, taskStore, navigation, route }: Props) => {
     const [title, setTitle] = useState("");
-    const [description, setDescription] = useState("");
     const [userId, setUserId] = useState<string | null>(null);
+    const bottomTabBarHeight = useBottomTabBarHeight();
 
     useEffect(() => {
       if (authStore.user) {
@@ -43,16 +40,24 @@ const TaskManager: React.FC<Props> = inject(
     }, []);
 
     const handleAddTask = async () => {
+      if (!title.trim()) {
+        Toast.show({
+          type: "error",
+          text1: "Task title cannot be empty!",
+          topOffset: 50,
+          position: "top",
+        });
+        return;
+      }
+
       if (userId) {
         const newTask: TaskToCreate = {
           title,
-          description,
           completed: false,
           userId: userId,
         };
-        await taskStore.addTask(newTask);
         setTitle("");
-        setDescription("");
+        await taskStore.addTask(newTask);
       }
     };
 
@@ -77,33 +82,38 @@ const TaskManager: React.FC<Props> = inject(
     }
 
     return (
-      <SafeAreaView>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <Text style={styles.header}>Task Manager</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Task Title"
-            value={title}
-            onChangeText={setTitle}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Task Description"
-            value={description}
-            onChangeText={setDescription}
-          />
-          <Button title="Add Task" onPress={handleAddTask} />
-
-          {taskStore.tasks.map((task) => (
-            <TaskComponent
-              key={task.id}
-              task={task}
-              onEdit={handleEditTask}
-              onToggleComplete={handleToggleComplete}
-              onDelete={handleDeleteTask}
+          <View style={styles.flexRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add a new task!"
+              value={title}
+              onChangeText={setTitle}
             />
-          ))}
+            <Icon
+              name="add"
+              size={30}
+              type="material"
+              color="black"
+              onPress={handleAddTask}
+            />
+          </View>
+
+          <FlatList
+            data={taskStore.tasks}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TaskComponent
+                task={item}
+                onEdit={handleEditTask}
+                onToggleComplete={handleToggleComplete}
+                onDelete={handleDeleteTask}
+              />
+            )}
+          />
+         
         </View>
       </SafeAreaView>
     );
@@ -111,25 +121,39 @@ const TaskManager: React.FC<Props> = inject(
 );
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   container: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 2,
+    flex: 1,
+    backgroundColor: "#fff",
   },
   header: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 16,
+    paddingBottom: 10,
+    textAlign: "center",
   },
   input: {
     height: 40,
     borderColor: "#ccc",
     borderWidth: 1,
-    marginBottom: 12,
     paddingHorizontal: 8,
+    flex: 1,
   },
   task: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
+  },
+  flexRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingBottom: 16,
   },
 });
 

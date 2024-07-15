@@ -8,10 +8,7 @@ import {
   User,
 } from "firebase/auth";
 import {
-  addDoc,
-  collection,
   doc,
-  getDoc,
   onSnapshot,
   setDoc,
 } from "firebase/firestore";
