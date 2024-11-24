@@ -1,4 +1,4 @@
-A simple task manager in React Native, with a third party state management system (MobX)
+A simple task manager in React Native, with a third party state management system (MobX), and Firebase integration
 
 To run the app, please go to the home directory of the project and follow these steps: 
 
